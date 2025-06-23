@@ -1,6 +1,6 @@
 #!/bin/bash -eu
 
-
+# Install build dependencies
 apt-get update
 apt-get install -y build-essential cmake pkg-config git libjson-c-dev
 
@@ -8,6 +8,7 @@ DEPS_DIR="$PWD/deps"
 mkdir -p "$DEPS_DIR"
 cd "$DEPS_DIR"
 
+# Build libubox from source
 if [ ! -d "libubox" ]; then
     echo "Downloading libubox..."
     git clone https://github.com/openwrt/libubox.git
@@ -19,11 +20,13 @@ cd build
 cmake .. -DCMAKE_INSTALL_PREFIX="$DEPS_DIR/install" \
          -DCMAKE_C_FLAGS="$CFLAGS" \
          -DBUILD_LUA=OFF \
-         -DBUILD_EXAMPLES=OFF
+         -DBUILD_EXAMPLES=OFF \
+         -DBUILD_SHARED_LIBS=OFF  # Build static library
 make -j$(nproc)
 make install
 cd "$DEPS_DIR"
 
+# Build libuci from source
 if [ ! -d "uci" ]; then
     echo "Downloading libuci..."
     git clone https://git.openwrt.org/project/uci.git
@@ -34,11 +37,13 @@ mkdir -p build
 cd build
 cmake .. -DCMAKE_INSTALL_PREFIX="$DEPS_DIR/install" \
          -DCMAKE_C_FLAGS="$CFLAGS" \
-         -DBUILD_LUA=OFF
+         -DBUILD_LUA=OFF \
+         -DBUILD_SHARED_LIBS=OFF  # Build static library
 make -j$(nproc)
 make install
 cd "$DEPS_DIR"
 
+# Build libnl-tiny from source
 if [ ! -d "libnl-tiny" ]; then
     echo "Downloading libnl-tiny..."
     git clone https://git.openwrt.org/project/libnl-tiny.git
@@ -48,11 +53,13 @@ cd libnl-tiny
 mkdir -p build
 cd build
 cmake .. -DCMAKE_INSTALL_PREFIX="$DEPS_DIR/install" \
-         -DCMAKE_C_FLAGS="$CFLAGS"
+         -DCMAKE_C_FLAGS="$CFLAGS" \
+         -DBUILD_SHARED_LIBS=OFF  # Build static library
 make -j$(nproc)
 make install
 cd "$DEPS_DIR"
 
+# Build libubus from source
 if [ ! -d "ubus" ]; then
     echo "Downloading libubus..."
     git clone https://git.openwrt.org/project/ubus.git
@@ -64,13 +71,31 @@ cd build
 cmake .. -DCMAKE_INSTALL_PREFIX="$DEPS_DIR/install" \
          -DCMAKE_C_FLAGS="$CFLAGS" \
          -DBUILD_LUA=OFF \
-         -DBUILD_EXAMPLES=OFF
+         -DBUILD_EXAMPLES=OFF \
+         -DBUILD_SHARED_LIBS=OFF  # Build static library
+make -j$(nproc)
+make install
+cd "$DEPS_DIR"
+
+# Build static json-c from source
+if [ ! -d "json-c" ]; then
+    echo "Downloading json-c..."
+    git clone https://github.com/json-c/json-c.git
+fi
+
+cd json-c
+mkdir -p build
+cd build
+cmake .. -DCMAKE_INSTALL_PREFIX="$DEPS_DIR/install" \
+         -DCMAKE_C_FLAGS="$CFLAGS" \
+         -DBUILD_SHARED_LIBS=OFF  # Build static library
 make -j$(nproc)
 make install
 cd "$DEPS_DIR"
 
 cd ..
 
+# Initialize variables if not already set
 : "${CFLAGS:=-O2 -fPIC}"
 : "${LDFLAGS:=}"
 : "${PKG_CONFIG_PATH:=}"
@@ -110,29 +135,16 @@ $CC $CFLAGS $LIB_FUZZING_ENGINE fuzz_odhcpd.o \
     src/odhcpd.o src/config.o src/router.o src/dhcpv6.o src/ndp.o \
     src/dhcpv6-ia.o src/dhcpv6-pxe.o src/netlink.o src/dhcpv4.o \
     src/ubus.o \
-    $LDFLAGS -lubox -luci -lnl-tiny -lresolv -ljson-c -lubus \
+    -static \
+    $DEPS_DIR/install/lib/libubox.a \
+    $DEPS_DIR/install/lib/libuci.a \
+    $DEPS_DIR/install/lib/libnl-tiny.a \
+    $DEPS_DIR/install/lib/libubus.a \
+    $DEPS_DIR/install/lib/libjson-c.a \
+    -lresolv \
     -o $OUT/odhcpd_fuzzer
 
-if [ -f fuzz_dhcpv4.c ]; then
-    $CC $CFLAGS -c fuzz_dhcpv4.c -o fuzz_dhcpv4.o
-    $CC $CFLAGS $LIB_FUZZING_ENGINE fuzz_dhcpv4.o \
-        src/odhcpd.o src/config.o src/router.o src/dhcpv6.o src/ndp.o \
-        src/dhcpv6-ia.o src/dhcpv6-pxe.o src/netlink.o src/dhcpv4.o \
-        src/ubus.o \
-        -lubox -luci -lnl-tiny -lresolv \
-        -o $OUT/odhcpd_dhcpv4_fuzzer
-fi
-
-if [ -f fuzz_dhcpv6.c ]; then
-    $CC $CFLAGS -c fuzz_dhcpv6.c -o fuzz_dhcpv6.o
-    $CC $CFLAGS $LIB_FUZZING_ENGINE fuzz_dhcpv6.o \
-        src/odhcpd.o src/config.o src/router.o src/dhcpv6.o src/ndp.o \
-        src/dhcpv6-ia.o src/dhcpv6-pxe.o src/netlink.o src/dhcpv4.o \
-        src/ubus.o \
-        -lubox -luci -lnl-tiny -lresolv \
-        -o $OUT/odhcpd_dhcpv6_fuzzer
-fi
-
+# Clean up object files
 rm -f *.o src/*.o
 
 echo "Build completed successfully!"
