@@ -3,7 +3,7 @@ language: c
 primary_contact: steven@midlink.org
 auto_ccs:
   - dedeckeh@gmail.com
-main_repo: https://git.openwrt.org/project/odhcpd.git
+main_repo: https://github.com/TanushM-tob/odhcpd-oss-fuzz.git
 sanitizers:
   - address
   - undefined

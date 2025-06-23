@@ -74,6 +74,7 @@ static bool ipv6_enabled(void)
 	return true;
 }
 
+#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
 int main(int argc, char **argv)
 {
 	openlog("odhcpd", LOG_PERROR | LOG_PID, LOG_DAEMON);
@@ -134,6 +135,7 @@ int main(int argc, char **argv)
 	odhcpd_run();
 	return 0;
 }
+#endif
 
 
 /* Read IPv6 MTU for interface */
