@@ -74,6 +74,10 @@ cd ..
 : "${CFLAGS:=-O2 -fPIC}"
 : "${LDFLAGS:=}"
 : "${PKG_CONFIG_PATH:=}"
+: "${LIB_FUZZING_ENGINE:=-fsanitize=fuzzer}"  # Default to libFuzzer if not provided
+
+# Add flag to suppress C23 extension warnings
+export CFLAGS="$CFLAGS -Wno-c23-extensions"
 
 export PKG_CONFIG_PATH="$DEPS_DIR/install/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
 export CFLAGS="$CFLAGS -I$DEPS_DIR/install/include"
