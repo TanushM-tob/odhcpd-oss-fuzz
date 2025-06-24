@@ -105,23 +105,13 @@ cd ..
 echo "Compiling fuzzer..."
 $CC $CFLAGS -c fuzz_odhcpd.c -o fuzz_odhcpd.o
 
-echo "Linking fuzzer..."
+echo "Linking fuzzer statically..."
 $CC $CFLAGS $LIB_FUZZING_ENGINE fuzz_odhcpd.o \
     src/odhcpd.o src/config.o src/router.o src/dhcpv6.o src/ndp.o \
     src/dhcpv6-ia.o src/dhcpv6-pxe.o src/netlink.o src/dhcpv4.o \
     src/ubus.o \
-    $LDFLAGS -lubox -luci -lnl-tiny -lresolv -ljson-c -lubus \
-    -Wl,-rpath,'$ORIGIN' \
+    $LDFLAGS -static -lubox -luci -lnl-tiny -lresolv -ljson-c -lubus \
     -o $OUT/odhcpd_fuzzer
-
-# Copy all required shared libraries to output directory
-cp deps/install/lib/libubox.so* $OUT/ 2>/dev/null || true
-cp deps/install/lib/libuci.so* $OUT/ 2>/dev/null || true
-cp deps/install/lib/libnl-tiny.so* $OUT/ 2>/dev/null || true
-cp deps/install/lib/libubus.so* $OUT/ 2>/dev/null || true
-
-# Copy system json-c library if available
-cp /usr/lib/x86_64-linux-gnu/libjson-c.so* $OUT/ 2>/dev/null || true
 rm -f *.o src/*.o
 
 echo "Build completed successfully!"
