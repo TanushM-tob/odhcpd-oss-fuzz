@@ -47,6 +47,7 @@ cmake -S ubus -B ubus/build \
   -DCMAKE_INSTALL_PREFIX="$DEPS_DIR/install" \
   -DCMAKE_C_FLAGS="$CFLAGS" \
   -DBUILD_STATIC=ON \
+  -DCMAKE_EXE_LINKER_FLAGS="-lrt" \
   -DBUILD_SHARED_LIBS=OFF \
   -DBUILD_LUA=OFF \
   -DBUILD_EXAMPLES=OFF
@@ -70,7 +71,13 @@ $CC $CFLAGS -c "../fuzz_odhcpd.c" -o fuzz_odhcpd.o
 
 $CC $CFLAGS $LIB_FUZZING_ENGINE fuzz_odhcpd.o \
   odhcpd.o config.o router.o dhcpv6.o ndp.o dhcpv6-ia.o dhcpv6-pxe.o netlink.o dhcpv4.o ubus.o \
-  $LDFLAGS -lubox -luci -lubus -lnl-tiny -ljson-c -lresolv \
+  $LDFLAGS \
+  "$DEPS_DIR/install/lib/libubox.a" \
+  "$DEPS_DIR/install/lib/libuci.a" \
+  "$DEPS_DIR/install/lib/libubus.a" \
+  "$DEPS_DIR/install/lib/libnl-tiny.a" \
+  -Wl,-Bstatic -ljson-c -Wl,-Bdynamic \
+  -lresolv -lrt \
   -o "$OUT/odhcpd_fuzzer"
 
 rm -f *.o
