@@ -19,7 +19,9 @@ cd build
 cmake .. -DCMAKE_INSTALL_PREFIX="$DEPS_DIR/install" \
          -DCMAKE_C_FLAGS="$CFLAGS" \
          -DBUILD_LUA=OFF \
-         -DBUILD_EXAMPLES=OFF
+         -DBUILD_EXAMPLES=OFF \
+         -DBUILD_STATIC=ON \
+         -DBUILD_SHARED_LIBS=OFF
 make -j$(nproc)
 make install
 cd "$DEPS_DIR"
@@ -34,7 +36,8 @@ mkdir -p build
 cd build
 cmake .. -DCMAKE_INSTALL_PREFIX="$DEPS_DIR/install" \
          -DCMAKE_C_FLAGS="$CFLAGS" \
-         -DBUILD_LUA=OFF
+         -DBUILD_LUA=OFF \
+         -DBUILD_SHARED_LIBS=OFF
 make -j$(nproc)
 make install
 cd "$DEPS_DIR"
@@ -48,7 +51,8 @@ cd libnl-tiny
 mkdir -p build
 cd build
 cmake .. -DCMAKE_INSTALL_PREFIX="$DEPS_DIR/install" \
-         -DCMAKE_C_FLAGS="$CFLAGS"
+         -DCMAKE_C_FLAGS="$CFLAGS" \
+         -DBUILD_SHARED_LIBS=OFF
 make -j$(nproc)
 make install
 cd "$DEPS_DIR"
@@ -64,7 +68,8 @@ cd build
 cmake .. -DCMAKE_INSTALL_PREFIX="$DEPS_DIR/install" \
          -DCMAKE_C_FLAGS="$CFLAGS" \
          -DBUILD_LUA=OFF \
-         -DBUILD_EXAMPLES=OFF
+         -DBUILD_EXAMPLES=OFF \
+         -DBUILD_SHARED_LIBS=OFF
 make -j$(nproc)
 make install
 cd "$DEPS_DIR"
