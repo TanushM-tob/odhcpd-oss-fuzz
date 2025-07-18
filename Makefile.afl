@@ -1,0 +1,164 @@
+#!/usr/bin/make -f
+
+# AFL++ Makefile for odhcpd fuzzer
+# Generated based on build.sh and previous Makefile patterns
+
+# -----------------------------------------------------------------------------
+# 1. Compiler autodetection (afl-clang-lto ▸ afl-clang-fast ▸ afl-gcc)
+# -----------------------------------------------------------------------------
+CC := afl-clang-lto
+ifeq ($(shell which afl-clang-lto 2>/dev/null),)
+  CC := afl-clang-fast
+  ifeq ($(shell which afl-clang-fast 2>/dev/null),)
+    CC := afl-gcc
+  endif
+endif
+
+CC_GCC := $(shell which afl-gcc 2>/dev/null)
+ifeq ($(CC_GCC),)
+CC_GCC := $(CC)
+endif
+
+# -----------------------------------------------------------------------------
+# 2. Global paths & flags
+# -----------------------------------------------------------------------------
+export DEPS_DIR := $(abspath $(CURDIR)/deps)
+export INSTALL_PREFIX := $(DEPS_DIR)/install
+CFLAGS := -O2 -fPIC -std=gnu99 -g -Wall -Wno-c23-extensions -D_GNU_SOURCE -DDHCPV4_SUPPORT -DWITH_UBUS
+LDFLAGS :=
+
+INCLUDE_DIRS := -I$(INSTALL_PREFIX)/include -I$(INSTALL_PREFIX)/include/libnl-tiny -I$(CURDIR)/src
+LIB_DIRS     := -L$(INSTALL_PREFIX)/lib
+
+# -----------------------------------------------------------------------------
+# 3. Source lists
+# -----------------------------------------------------------------------------
+ODHCPD_SRC := src/odhcpd.c src/config.c src/router.c src/dhcpv6.c src/ndp.c \
+             src/dhcpv6-ia.c src/dhcpv6-pxe.c src/netlink.c src/dhcpv4.c \
+             src/ubus.c
+
+ODHCPD_OBJ := $(ODHCPD_SRC:.c=.o)
+FUZZER_SRC := fuzz_odhcpd.c
+FUZZER_OBJ := fuzz_odhcpd.o
+FUZZER_BIN := odhcpd_afl_fuzzer
+
+# -----------------------------------------------------------------------------
+# 4. Top-level targets
+# -----------------------------------------------------------------------------
+.PHONY: all deps clean distclean help
+
+all: deps $(FUZZER_BIN)
+
+# -----------------------------------------------------------------------------
+# 5. Dependency chain (libubox, uci, libnl-tiny, ubus)
+# -----------------------------------------------------------------------------
+DEPS_LIBS := \
+  $(INSTALL_PREFIX)/lib/libubox.a \
+  $(INSTALL_PREFIX)/lib/libuci.a \
+  $(INSTALL_PREFIX)/lib/libnl-tiny.a \
+  $(INSTALL_PREFIX)/lib/libubus.a
+
+deps: $(DEPS_LIBS)
+	@echo "✓ Dependencies ready"
+
+# -- libubox -------------------------------------------------------------------
+$(INSTALL_PREFIX)/lib/libubox.a:
+	@echo "[libubox] build"
+	@mkdir -p $(DEPS_DIR)
+	@if [ ! -d "$(DEPS_DIR)/libubox" ]; then \
+		cd $(DEPS_DIR) && git clone --depth 1 https://github.com/openwrt/libubox.git; \
+	fi
+	@cd $(DEPS_DIR)/libubox && rm -rf tests examples lua || true
+	@cd $(DEPS_DIR)/libubox && sed -i '/[Aa][Dd][Dd]_SUBDIRECTORY.*examples/d' CMakeLists.txt || true
+	@cd $(DEPS_DIR)/libubox && sed -i '/[Aa][Dd][Dd]_SUBDIRECTORY.*lua/d' CMakeLists.txt || true
+	@cd $(DEPS_DIR)/libubox && \
+		mkdir -p build && cd build && \
+		cmake .. -DCMAKE_INSTALL_PREFIX="$(INSTALL_PREFIX)" \
+		     -DCMAKE_C_COMPILER="$(CC)" -DCMAKE_C_FLAGS="-O2 -fPIC -g" \
+		     -DBUILD_STATIC=ON -DBUILD_SHARED_LIBS=OFF -DBUILD_LUA=OFF -DBUILD_EXAMPLES=OFF \
+		     -DBUILD_TESTS=OFF && \
+		make -j$$(nproc) && make install
+
+# -- uci -----------------------------------------------------------------------
+$(INSTALL_PREFIX)/lib/libuci.a: $(INSTALL_PREFIX)/lib/libubox.a
+	@echo "[uci] build"
+	@if [ ! -d "$(DEPS_DIR)/uci" ]; then \
+		cd $(DEPS_DIR) && git clone --depth 1 https://git.openwrt.org/project/uci.git; \
+	fi
+	@cd $(DEPS_DIR)/uci && rm -rf tests || true
+	@cd $(DEPS_DIR)/uci && \
+		mkdir -p build && cd build && \
+		cmake .. -DCMAKE_INSTALL_PREFIX="$(INSTALL_PREFIX)" \
+		     -DCMAKE_C_COMPILER="$(CC)" -DCMAKE_C_FLAGS="-O2 -fPIC -g" \
+		     -DBUILD_STATIC=ON -DBUILD_SHARED_LIBS=OFF -DBUILD_LUA=OFF \
+		     -DCMAKE_POSITION_INDEPENDENT_CODE=ON && \
+		make -j$$(nproc) && make install
+
+# -- libnl-tiny ----------------------------------------------------------------
+$(INSTALL_PREFIX)/lib/libnl-tiny.a:
+	@echo "[libnl-tiny] build"
+	@if [ ! -d "$(DEPS_DIR)/libnl-tiny" ]; then \
+		cd $(DEPS_DIR) && git clone --depth 1 https://git.openwrt.org/project/libnl-tiny.git; \
+	fi
+	@cd $(DEPS_DIR)/libnl-tiny && rm -rf tests || true
+	@cd $(DEPS_DIR)/libnl-tiny && \
+		mkdir -p build && cd build && \
+		cmake .. -DCMAKE_INSTALL_PREFIX="$(INSTALL_PREFIX)" \
+		     -DCMAKE_C_COMPILER="$(CC)" -DCMAKE_C_FLAGS="-O2 -fPIC -g" \
+		     -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTS=OFF && \
+		make -j$$(nproc) && make install
+
+# -- ubus ----------------------------------------------------------------------
+$(INSTALL_PREFIX)/lib/libubus.a: $(INSTALL_PREFIX)/lib/libubox.a
+	@echo "[ubus] build"
+	@if [ ! -d "$(DEPS_DIR)/ubus" ]; then \
+		cd $(DEPS_DIR) && git clone --depth 1 https://git.openwrt.org/project/ubus.git; \
+	fi
+	@cd $(DEPS_DIR)/ubus && rm -rf tests examples lua || true
+	@cd $(DEPS_DIR)/ubus && sed -i '/[Aa][Dd][Dd]_SUBDIRECTORY.*examples/d' CMakeLists.txt || true
+	@cd $(DEPS_DIR)/ubus && sed -i '/[Aa][Dd][Dd]_SUBDIRECTORY.*lua/d' CMakeLists.txt || true
+	@cd $(DEPS_DIR)/ubus && \
+		mkdir -p build && cd build && \
+		cmake .. -DCMAKE_INSTALL_PREFIX="$(INSTALL_PREFIX)" \
+		     -DCMAKE_C_COMPILER="$(CC)" -DCMAKE_C_FLAGS="-O2 -fPIC -g" \
+		     -DBUILD_STATIC=ON -DBUILD_LUA=OFF -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=OFF \
+		     -DCMAKE_EXE_LINKER_FLAGS="-lrt" -DBUILD_SHARED_LIBS=OFF && \
+		make -j$$(nproc) && make install
+
+# -----------------------------------------------------------------------------
+# 6. Object compilation
+# -----------------------------------------------------------------------------
+%.o: %.c deps
+	$(CC) $(CFLAGS) $(INCLUDE_DIRS) -c $< -o $@
+
+src/config.o: src/config.c deps
+	$(CC_GCC) $(CFLAGS) $(INCLUDE_DIRS) -Wno-error -c $< -o $@
+
+src/dhcpv4.o: src/dhcpv4.c deps
+	$(CC_GCC) $(CFLAGS) $(INCLUDE_DIRS) -Wno-error -c $< -o $@
+
+$(FUZZER_OBJ): $(FUZZER_SRC) deps
+	$(CC) $(CFLAGS) $(INCLUDE_DIRS) -c $< -o $@
+
+# -----------------------------------------------------------------------------
+# 7. Linking
+# -----------------------------------------------------------------------------
+$(FUZZER_BIN): $(ODHCPD_OBJ) $(FUZZER_OBJ)
+	@echo "[Link] odhcpd AFL++ fuzzer"
+	$(CC) $(CFLAGS) $(ODHCPD_OBJ) $(FUZZER_OBJ) \
+		$(LIB_DIRS) $(LDFLAGS) \
+		-lubox -luci -lubus -lnl-tiny -ljson-c -lresolv -lrt \
+		-o $@
+	@echo "✓ Built: $@"
+
+# -----------------------------------------------------------------------------
+# 8. Convenience
+# -----------------------------------------------------------------------------
+clean:
+	rm -f $(ODHCPD_OBJ) $(FUZZER_OBJ) $(FUZZER_BIN)
+
+distclean: clean
+	rm -rf $(DEPS_DIR)
+
+help:
+	@echo "AFL++ odhcpd Fuzzer Makefile" 
