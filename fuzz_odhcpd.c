@@ -64,6 +64,12 @@ static void fuzz_dhcpv4(const uint8_t *data, size_t size) {
     dhcpv4_handle_msg(&client_addr, copy, size, &iface, NULL, 
                       mock_send_reply, &dummy_fd);
 
+    // Clean up any DHCP assignments created during message handling to prevent memory leaks
+    struct dhcp_assignment *a, *tmp;
+    list_for_each_entry_safe(a, tmp, &iface.dhcpv4_assignments, head) {
+        free_assignment(a);
+    }
+
     if (size >= 4 && size <= 1024) {
         uint8_t *config_copy = malloc(size);
         if (config_copy) {
@@ -198,6 +204,12 @@ static void fuzz_dhcpv6(const uint8_t *data, size_t size) {
         iface_no_dns.dns = NULL;
         iface_no_dns.dns_cnt = 0;
         handle_dhcpv6(&source_addr, copy, size, &iface_no_dns, &dest_addr);
+    }
+    
+    // Clean up any DHCPv6 assignments created during message handling to prevent memory leaks
+    struct dhcp_assignment *a, *tmp;
+    list_for_each_entry_safe(a, tmp, &iface_server.ia_assignments, head) {
+        free_assignment(a);
     }
     
     free(copy);
